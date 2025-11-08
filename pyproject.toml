@@ -1,0 +1,13 @@
+[project]
+name = "gaz"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "datashader>=0.18.2",
+    "holoviews>=1.21.0",
+    "numpy>=2.3.4",
+    "panel>=1.8.2",
+    "ruff>=0.14.4",
+]

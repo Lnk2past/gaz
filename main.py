@@ -1,0 +1,90 @@
+import datetime
+import sys
+from typing import Any
+
+sys.path.append("build/Release/src")
+
+import holoviews as hv
+import numpy as np
+import pandas as pd
+import panel as pn
+from holoviews.streams import Stream
+
+import gaz
+
+hv.extension("bokeh")
+pn.extension()
+
+
+# globals
+gaz_model = None
+model_data = None
+update_callback = None
+
+# widgets
+entity_count_slider = pn.widgets.IntSlider(name="N", start=1, end=100000, step=100, value=1000)
+launch_button = pn.widgets.Button(name="Launch")
+
+
+def launch(event: Any) -> None:
+    """Starts/stops updating the Gaz model
+
+    Args:
+        event: what triggered this function
+    """
+    global update_callback, gaz_model, model_data
+    if gaz_model is None:
+        gaz_model = gaz.Gaz(entity_count_slider.value)
+        model_data = gaz_model.get()
+    if update_callback is not None and update_callback.running:
+        update_callback.stop()
+        update_callback = None
+        gaz_model = None
+    else:
+        update_callback = pn.state.add_periodic_callback(update, 33)
+
+
+launch_button.on_click(launch)
+
+
+@pn.depends(entity_count_slider, watch=True)
+def set_number_of_entities(n: int) -> None:
+    """Dynamically sets the number of entities to simulate. This stops
+    any callbacks and resets the state of the simulation.
+
+    Args:
+        n: number of entities to simulate
+    """
+    global update_callback, gaz_model, model_data
+    if update_callback is not None and update_callback.running:
+        update_callback.stop()
+        update_callback = None
+    gaz_model = gaz.Gaz(n)
+    model_data = gaz_model.get()
+
+
+def update() -> None:
+    """Updates the underlying model and triggers a refresh of the visualization"""
+    gaz_model.update(datetime.timedelta(seconds=0.1))
+    trigger.event(refresh=not trigger.refresh)
+
+
+def viz_gaz(**kwargs) -> hv.Points:
+    """Visualizes the model data from Gaz"""
+    return hv.Points(model_data)
+
+
+# Custom trigger definition + instance for refreshing the visualization
+trigger = Stream.define("Trigger", refresh=False)()
+
+# Dynamic visualization
+dynamic_map = hv.DynamicMap(viz_gaz, streams=[trigger]).opts(hv.opts.Points(size=1))
+
+# Layout
+pn.Column(
+    entity_count_slider,
+    launch_button,
+    dynamic_map.opts(
+        height=600, width=600, aspect="equal", xlim=(-510, 510), ylim=(-510, 510)
+    ),
+).servable()
