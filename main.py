@@ -1,5 +1,6 @@
 import datetime
 import sys
+import time
 from typing import Any
 
 sys.path.append("build/Release/src")
@@ -11,18 +12,23 @@ import panel as pn
 from holoviews.streams import Stream
 
 import gaz
+import simple_model
 
 hv.extension("bokeh")
 pn.extension()
 
 
-# globals
-gaz_model = None
-model_data = None
+# WalkModel = gaz.Gaz
+WalkModel = simple_model.Model
+
+gaz_model = WalkModel(1000)
 update_callback = None
+last_start_time = None
 
 # widgets
-entity_count_slider = pn.widgets.IntSlider(name="N", start=1, end=100000, step=100, value=1000)
+entity_count_slider = pn.widgets.IntSlider(
+    name="N", start=1, end=100000, step=100, value=1000
+)
 launch_button = pn.widgets.Button(name="Launch")
 
 
@@ -34,7 +40,7 @@ def launch(event: Any) -> None:
     """
     global update_callback, gaz_model, model_data
     if gaz_model is None:
-        gaz_model = gaz.Gaz(entity_count_slider.value)
+        gaz_model = WalkModel(entity_count_slider.value)
         model_data = gaz_model.get()
     if update_callback is not None and update_callback.running:
         update_callback.stop()
@@ -59,18 +65,34 @@ def set_number_of_entities(n: int) -> None:
     if update_callback is not None and update_callback.running:
         update_callback.stop()
         update_callback = None
-    gaz_model = gaz.Gaz(n)
+    gaz_model = WalkModel(n)
     model_data = gaz_model.get()
+
+
+last_start_time = None
 
 
 def update() -> None:
     """Updates the underlying model and triggers a refresh of the visualization"""
+    global last_start_time
+    start = time.perf_counter()
+
     gaz_model.update(datetime.timedelta(seconds=0.1))
     trigger.event(refresh=not trigger.refresh)
+
+    duration = (time.perf_counter() - start) * 1000
+    if duration > 33:
+        print(f"⚠️ Update took {duration:.1f} ms (>33 ms)")
+
+    last_start_time = start
+
+
+rng = np.random.default_rng(1337)
 
 
 def viz_gaz(**kwargs) -> hv.Points:
     """Visualizes the model data from Gaz"""
+    model_data = gaz_model.get()
     return hv.Points(model_data)
 
 
