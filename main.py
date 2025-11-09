@@ -16,7 +16,7 @@ import simple_model
 
 hv.extension("bokeh")
 pn.extension()
-
+hv.renderer('bokeh').webgl = True
 
 # WalkModel = gaz.Gaz
 WalkModel = simple_model.Model
